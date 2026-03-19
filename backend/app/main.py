@@ -71,8 +71,51 @@ def health():
 
 
 def _value_kw(body: VisualizeRequest) -> dict[str, Any]:
-    pass
+    out: dict[str, Any] = {}
+    if body.tensors is not None and len(body.tensors) > 0:
+        out["tensors"] = body.tensors
+    else:
+        if body.values is not None:
+            out["values"] = body.values
+        if body.values_2 is not None:
+            out["values_2"] = body.values_2
+    return out
+
 
 @app.post("/api/visualize", response_model=VisualizeResponse)
 def visualize(body: VisualizeRequest):
-    pass
+    try:
+        vk = _value_kw(body)
+        if body.mode == "code":
+            if not body.code:
+                raise TensorVizError("code mode requires non-empty code")
+            v_b, id_b, s_b, v_a, id_a, s_a, op_name, bases_t = apply_code(
+                body.code, body.initial_shape, vk
+            )
+        else:
+            if not body.operation:
+                raise TensorVizError("gui mode requires operation")
+            merged = {**(body.op_kwargs or {}), **vk}
+            v_b, id_b, s_b, v_a, id_a, s_a, bases_t = apply_gui(
+                body.initial_shape,
+                body.operation,
+                merged,
+            )
+            op_name = body.operation.strip().lower()
+
+        before_el = _pair_elements(v_b, id_b, s_b)
+        after_el = _pair_elements(v_a, id_a, s_a)
+        bases_states = [
+            TensorState(shape=list(s), elements=_pair_elements(v, i, s)) for v, i, s in bases_t
+        ]
+
+        return VisualizeResponse(
+            operation=op_name,
+            before=TensorState(shape=list(s_b), elements=before_el),
+            after=TensorState(shape=list(s_a), elements=after_el),
+            bases=bases_states,
+        )
+    except TensorVizError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
