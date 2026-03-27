@@ -11,3 +11,12 @@ dependencies = [
     "pydantic>=2.9.0",
     "torch>=2.5.0",
 ]
+
+# Linux wheels on PyPI default to CUDA; pin CPU-only builds (matches local CPU use, smaller Docker).
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
