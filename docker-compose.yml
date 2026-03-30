@@ -4,16 +4,16 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "7860:7860"
     environment:
-      TENSOR_VIZ_CORS_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"
+      TENSOR_VIZ_CORS_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173"    
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://127.0.0.1:8000
+        VITE_API_URL: http://127.0.0.1:7860
     ports:
       - "5173:5173"
     depends_on:
