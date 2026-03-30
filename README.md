@@ -9,9 +9,9 @@
 
 <p align="center">
   <a href="https://tensorviz.netlify.app/"><img src="https://img.shields.io/badge/Live%20Demo-tensorviz.netlify.app-00C7B7?style=for-the-badge&logo=netlify&logoColor=white" alt="Live Demo"></a>
-  <img src="https://img.shields.io/badge/Powered_by-PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" alt="Powered by PyTorch">
-  <img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="Backend FastAPI">
-  <img src="https://img.shields.io/badge/Frontend-React_Three_Fiber-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="Frontend React">
+  <a href="https://pytorch.org/get-started/locally/"><img src="https://img.shields.io/badge/Powered_by-PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" alt="Powered by PyTorch">
+  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="Backend FastAPI">
+  <a href="https://r3f.docs.pmnd.rs/getting-started/introduction"><img src="https://img.shields.io/badge/Frontend-React_Three_Fiber-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="Frontend React">
 </p>
 
 <p align="center">
