@@ -69,7 +69,11 @@ function buildTensorsPayload(
     if (!t) return null;
     return parseTensorPayload(t, shape);
   });
-  if (row.every((x) => x === null)) return undefined;
+  // All empty: omit tensors unless GUI stack — backend stack without `tensors` only builds two defaults (values + values_2).
+  if (row.every((x) => x === null)) {
+    if (mode === "gui-stack" && row.length >= 2) return row;
+    return undefined;
+  }
 
   if (mode === "gui-unary") {
     const only = row[0];
