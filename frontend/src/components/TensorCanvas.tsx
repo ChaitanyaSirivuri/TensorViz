@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 import type { VisualizeResponse } from "@/lib/api";
+import { getTensorAccentColor } from "@/lib/tensorVizPalette";
 import { VOXEL_SIZE, type Vec3 } from "@/lib/tensorViz3d";
 
 export type MergedBlock = {
@@ -13,9 +14,14 @@ export type MergedBlock = {
   from: Vec3;
   to: Vec3;
   multiIndex: number[];
+  baseIndex: number;
 };
 
 function mergeBlocks(res: VisualizeResponse): MergedBlock[] {
+  const elementsPerBase =
+    res.bases.length > 1 ? res.bases[0]?.elements.length ?? 0 : 0;
+  const multiSource = res.bases.length > 1 && elementsPerBase > 0;
+
   const beforeMap = new Map<number, { position: Vec3; value: number; multi_index: number[] }>();
   for (const e of res.before.elements) {
     beforeMap.set(e.id, {
@@ -28,12 +34,14 @@ function mergeBlocks(res: VisualizeResponse): MergedBlock[] {
   for (const e of res.after.elements) {
     const prev = beforeMap.get(e.id);
     const from = prev?.position ?? (e.position as Vec3);
+    const baseIndex = multiSource ? Math.floor(e.id / elementsPerBase) : 0;
     out.push({
       id: e.id,
       value: e.value,
       from,
       to: e.position as Vec3,
       multiIndex: [...e.multi_index],
+      baseIndex,
     });
   }
   return out;
@@ -171,6 +179,7 @@ function AnimatedCube({
   offset,
   run,
   darkMode,
+  fill,
 }: {
   from: Vec3;
   to: Vec3;
@@ -178,6 +187,7 @@ function AnimatedCube({
   offset: Vec3;
   run: boolean;
   darkMode: boolean;
+  fill: string;
 }) {
   const f = useMemo(() => from.map((v, i) => v + offset[i]) as Vec3, [from, offset]);
   const t = useMemo(() => to.map((v, i) => v + offset[i]) as Vec3, [to, offset]);
@@ -200,7 +210,6 @@ function AnimatedCube({
     setShowValue(d < 9 || hovered);
   });
 
-  const fill = "#22d3ee";
   const stroke = "#020617";
 
   return (
@@ -272,6 +281,7 @@ function Scene({
             offset={offset}
             run={run}
             darkMode={darkMode}
+            fill={getTensorAccentColor(b.baseIndex, darkMode)}
           />
         ))}
       </group>
