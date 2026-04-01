@@ -66,6 +66,7 @@ function centerOffset(blocks: MergedBlock[]): Vec3 {
 
 type BBox = { min: Vec3; max: Vec3 };
 type CameraView = { position: Vec3; target: Vec3 };
+type TickLine = { start: Vec3; end: Vec3 };
 
 function bboxFromPositions(positions: Vec3[]): BBox {
   const min: Vec3 = [Infinity, Infinity, Infinity];
@@ -98,14 +99,130 @@ function cameraViewForPositions(positions: Vec3[]): CameraView {
   };
 }
 
-function avg(nums: number[]): number {
-  return nums.reduce((a, b) => a + b, 0) / nums.length;
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
 }
 
-/** Bounding box of one axis slice (avoids placing ticks at slice centroid — e.g. dim-2 "2" between stack layers). */
-function bboxSlice(slice: { pos: Vec3 }[]): { min: Vec3; max: Vec3 } | null {
-  if (!slice.length) return null;
-  return bboxFromPositions(slice.map((s) => s.pos));
+function lerpVec(a: Vec3, b: Vec3, t: number): Vec3 {
+  return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+}
+
+function pointOnLine(line: TickLine, t: number): Vec3 {
+  return lerpVec(line.start, line.end, t);
+}
+
+function axisTickLine(rank: number, dim: number, global: BBox, margin: number): TickLine | null {
+  const frontZ = global.max[2] + margin * 0.4;
+  const leftX = global.min[0] - margin * 1.05;
+  const farLeftX = global.min[0] - margin * 2.1;
+  const rightX = global.max[0] + margin * 1.0;
+  const bottomY = global.min[1] - margin * 1.2;
+  const topY = global.max[1] + margin * 1.0;
+
+  if (rank === 1) {
+    return {
+      start: [global.min[0], bottomY, 0],
+      end: [global.max[0], bottomY, 0],
+    };
+  }
+
+  if (rank === 2) {
+    if (dim === 0) {
+      return {
+        start: [leftX, global.max[1], 0],
+        end: [leftX, global.min[1], 0],
+      };
+    }
+    if (dim === 1) {
+      return {
+        start: [global.min[0], bottomY, 0],
+        end: [global.max[0], bottomY, 0],
+      };
+    }
+  }
+
+  if (rank === 3) {
+    if (dim === 0) {
+      return {
+        start: [rightX, bottomY, global.max[2]],
+        end: [rightX, bottomY, global.min[2]],
+      };
+    }
+    if (dim === 1) {
+      return {
+        start: [leftX, global.max[1], frontZ],
+        end: [leftX, global.min[1], frontZ],
+      };
+    }
+    if (dim === 2) {
+      return {
+        start: [global.min[0], bottomY, frontZ],
+        end: [global.max[0], bottomY, frontZ],
+      };
+    }
+  }
+
+  if (rank === 4) {
+    if (dim === 0) {
+      return {
+        start: [global.min[0], topY, frontZ],
+        end: [global.max[0], topY, frontZ],
+      };
+    }
+    if (dim === 1) {
+      return {
+        start: [rightX, bottomY, global.max[2]],
+        end: [rightX, bottomY, global.min[2]],
+      };
+    }
+    if (dim === 2) {
+      return {
+        start: [leftX, global.max[1], frontZ],
+        end: [leftX, global.min[1], frontZ],
+      };
+    }
+    if (dim === 3) {
+      return {
+        start: [global.min[0], bottomY, frontZ],
+        end: [global.max[0], bottomY, frontZ],
+      };
+    }
+  }
+
+  if (rank === 5) {
+    if (dim === 0) {
+      return {
+        start: [farLeftX, global.max[1], frontZ],
+        end: [farLeftX, global.min[1], frontZ],
+      };
+    }
+    if (dim === 1) {
+      return {
+        start: [global.min[0], topY, frontZ],
+        end: [global.max[0], topY, frontZ],
+      };
+    }
+    if (dim === 2) {
+      return {
+        start: [rightX, bottomY, global.max[2]],
+        end: [rightX, bottomY, global.min[2]],
+      };
+    }
+    if (dim === 3) {
+      return {
+        start: [leftX, global.max[1], frontZ],
+        end: [leftX, global.min[1], frontZ],
+      };
+    }
+    if (dim === 4) {
+      return {
+        start: [global.min[0], bottomY, frontZ],
+        end: [global.max[0], bottomY, frontZ],
+      };
+    }
+  }
+
+  return null;
 }
 
 /** Axis tick: dimension index d, label k, world position for Html */
@@ -119,50 +236,12 @@ function buildAxisTicks(shape: number[], centered: { multiIndex: number[]; pos: 
 
   for (let d = 0; d < rank; d++) {
     const size = shape[d];
-    for (let k = 0; k < size; k++) {
-      const slice = centered.filter((c) => c.multiIndex[d] === k);
-      const B = bboxSlice(slice);
-      if (!B) continue;
+    const line = axisTickLine(rank, d, global, margin);
+    if (!line) continue;
 
-      let pos: Vec3;
-      if (rank === 1) {
-        const mx = (B.min[0] + B.max[0]) / 2;
-        pos = [mx, global.min[1] - margin, 0];
-      } else if (rank === 2) {
-        if (d === 0) {
-          const my = (B.min[1] + B.max[1]) / 2;
-          pos = [B.min[0] - margin, my, 0];
-        } else {
-          const mx = (B.min[0] + B.max[0]) / 2;
-          pos = [mx, B.min[1] - margin, 0];
-        }
-      } else if (rank === 3) {
-        if (d === 0) {
-          const my = (B.min[1] + B.max[1]) / 2;
-          pos = [B.min[0] - margin, my, B.min[2] - margin];
-        } else if (d === 1) {
-          const mx = (B.min[0] + B.max[0]) / 2;
-          pos = [mx, B.min[1] - margin, B.min[2] - margin];
-        } else {
-          const mx = (B.min[0] + B.max[0]) / 2;
-          const my = (B.min[1] + B.max[1]) / 2;
-          pos = [mx, my, B.min[2] - margin];
-        }
-      } else {
-        const cx = avg(slice.map((s) => s.pos[0]));
-        const cy = avg(slice.map((s) => s.pos[1]));
-        const cz = avg(slice.map((s) => s.pos[2]));
-        const dirs: Vec3[] = [
-          [0, -1, 0],
-          [-1, 0, 0],
-          [0, 0, -1],
-          [1, 0, 0],
-          [0, 1, 0],
-        ];
-        const dir = dirs[d % dirs.length];
-        const bump = margin + (d * 0.04 + k * 0.02) * 0.15;
-        pos = [cx + dir[0] * bump, cy + dir[1] * bump, cz + dir[2] * bump];
-      }
+    for (let k = 0; k < size; k++) {
+      const t = size === 1 ? 0.5 : k / (size - 1);
+      const pos = pointOnLine(line, t);
       out.push({ key: `d${d}-k${k}`, text: String(k), pos });
     }
   }

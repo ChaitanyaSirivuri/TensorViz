@@ -46,6 +46,16 @@ def _ensure_shape(shape: list[int]) -> tuple[int, ...]:
     return tuple(shape)
 
 
+def _normalize_dim(dim: int, rank: int, *, allow_insert: bool = False) -> int:
+    upper = rank if allow_insert else rank - 1
+    lower = -(rank + 1) if allow_insert else -rank
+    if dim < lower or dim > upper:
+        raise TensorVizError("dim out of range")
+    if dim < 0:
+        dim += rank + 1 if allow_insert else rank
+    return dim
+
+
 def _pair_elements(values: torch.Tensor, ids: torch.Tensor, shape: tuple[int, ...]) -> list[dict]:
     flat_v = values.reshape(-1)
     flat_i = ids.reshape(-1)
@@ -138,9 +148,12 @@ def apply_gui(
         return values, ids, shape_b, v_after, id_after, new_shape_t, bases_one
 
     if op == "transpose":
-        d0 = int(kwargs.get("dim0", 0))
-        d1 = int(kwargs.get("dim1", 1))
-        if d0 == d1 or d0 < 0 or d1 < 0 or d0 >= len(shape_b) or d1 >= len(shape_b):
+        try:
+            d0 = _normalize_dim(int(kwargs.get("dim0", 0)), len(shape_b))
+            d1 = _normalize_dim(int(kwargs.get("dim1", 1)), len(shape_b))
+        except TensorVizError as e:
+            raise TensorVizError("transpose: dim out of range") from e
+        if d0 == d1:
             raise TensorVizError("transpose: invalid dim0/dim1 for tensor rank")
         v_after = values.transpose(d0, d1)
         id_after = ids.transpose(d0, d1)
@@ -162,19 +175,21 @@ def apply_gui(
         return values, ids, shape_b, v_after, id_after, tuple(v_after.shape), bases_one
 
     if op == "unsqueeze":
-        dim = int(kwargs["dim"])
-        if dim < -(len(shape_b) + 1) or dim > len(shape_b):
-            raise TensorVizError("unsqueeze: dim out of range")
+        try:
+            dim = _normalize_dim(int(kwargs["dim"]), len(shape_b), allow_insert=True)
+        except TensorVizError as e:
+            raise TensorVizError("unsqueeze: dim out of range") from e
         v_after = values.unsqueeze(dim)
         id_after = ids.unsqueeze(dim)
         return values, ids, shape_b, v_after, id_after, tuple(v_after.shape), bases_one
 
     if op == "slice":
-        dim = int(kwargs.get("dim", 0))
+        try:
+            dim = _normalize_dim(int(kwargs.get("dim", 0)), len(shape_b))
+        except TensorVizError as e:
+            raise TensorVizError("slice: dim out of range") from e
         start = int(kwargs.get("start", 0))
         end = int(kwargs.get("end", 1))
-        if dim < 0 or dim >= len(shape_b):
-            raise TensorVizError("slice: dim out of range")
         if start < 0 or end > shape_b[dim] or start >= end:
             raise TensorVizError("slice: invalid start/end for this shape")
         sl = [slice(None)] * len(shape_b)
@@ -184,13 +199,14 @@ def apply_gui(
         return values, ids, shape_b, v_after, id_after, tuple(v_after.shape), bases_one
 
     if op == "index_select":
-        dim = int(kwargs.get("dim", 0))
+        try:
+            dim = _normalize_dim(int(kwargs.get("dim", 0)), len(shape_b))
+        except TensorVizError as e:
+            raise TensorVizError("index_select: dim out of range") from e
         index = kwargs.get("index")
         if not isinstance(index, list) or not index:
             raise TensorVizError("index_select requires non-empty index: list[int]")
-        idx_t = torch.tensor([int(i) for i in index], dtype=torch.long)
-        if dim < 0 or dim >= len(shape_b):
-            raise TensorVizError("index_select: dim out of range")
+        idx_t = torch.tensor([int(i) for i in index], dtype=torch.long, device=values.device)
         if (idx_t < 0).any() or (idx_t >= shape_b[dim]).any():
             raise TensorVizError("index_select: index out of bounds")
         v_after = values.index_select(dim, idx_t)
