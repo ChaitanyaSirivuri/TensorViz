@@ -6,21 +6,24 @@ import * as THREE from "three";
 
 import { Button } from "@/components/ui/button";
 import type { TensorState } from "@/lib/api";
+import { getTensorAccentColor } from "@/lib/tensorVizPalette";
 import { centerOffsetFromPositions, VOXEL_SIZE, type Vec3 } from "@/lib/tensorViz3d";
 
 function StaticVoxels({
   tensor,
   darkMode,
+  tensorIndex,
 }: {
   tensor: TensorState;
   darkMode: boolean;
+  tensorIndex: number;
 }) {
   const offset = useMemo(() => {
     const pos = tensor.elements.map((e) => e.position as Vec3);
     return centerOffsetFromPositions(pos);
   }, [tensor.elements]);
 
-  const fill = "#22d3ee";
+  const fill = getTensorAccentColor(tensorIndex, darkMode);
   const stroke = "#020617";
   const bg = darkMode ? "#0b0f12" : "#f8fafc";
 
@@ -116,7 +119,7 @@ export function BaseTensorPreviews({
           dpr={[1, 2]}
           gl={{ antialias: true, toneMapping: THREE.NoToneMapping }}
         >
-          <StaticVoxels tensor={current} darkMode={darkMode} />
+          <StaticVoxels tensor={current} darkMode={darkMode} tensorIndex={idx} />
         </Canvas>
       </div>
     </div>
