@@ -6,7 +6,7 @@ import * as THREE from "three";
 
 import type { VisualizeResponse } from "@/lib/api";
 import { getTensorAccentColor } from "@/lib/tensorVizPalette";
-import { VOXEL_SIZE, type Vec3 } from "@/lib/tensorViz3d";
+import { centerOffsetFromPositions, VOXEL_SIZE, type Vec3 } from "@/lib/tensorViz3d";
 
 export type MergedBlock = {
   id: number;
@@ -65,6 +65,7 @@ function centerOffset(blocks: MergedBlock[]): Vec3 {
 }
 
 type BBox = { min: Vec3; max: Vec3 };
+type CameraView = { position: Vec3; target: Vec3 };
 
 function bboxFromPositions(positions: Vec3[]): BBox {
   const min: Vec3 = [Infinity, Infinity, Infinity];
@@ -78,8 +79,33 @@ function bboxFromPositions(positions: Vec3[]): BBox {
   return { min, max };
 }
 
+function cameraViewForPositions(positions: Vec3[]): CameraView {
+  if (!positions.length) {
+    return { position: [8, 6, 10], target: [0, 0, 0] };
+  }
+
+  const offset = centerOffsetFromPositions(positions);
+  const centered = positions.map((p) => addVec(p, offset));
+  const box = bboxFromPositions(centered);
+  const spanX = box.max[0] - box.min[0] + VOXEL_SIZE;
+  const spanY = box.max[1] - box.min[1] + VOXEL_SIZE;
+  const spanZ = box.max[2] - box.min[2] + VOXEL_SIZE;
+  const span = Math.max(spanX, spanY, spanZ, 1);
+
+  return {
+    position: [span * 1.6 + 0.8, span * 1.2 + 0.6, span * 2.2 + 1.4],
+    target: [0, 0, 0],
+  };
+}
+
 function avg(nums: number[]): number {
   return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+/** Bounding box of one axis slice (avoids placing ticks at slice centroid — e.g. dim-2 "2" between stack layers). */
+function bboxSlice(slice: { pos: Vec3 }[]): { min: Vec3; max: Vec3 } | null {
+  if (!slice.length) return null;
+  return bboxFromPositions(slice.map((s) => s.pos));
 }
 
 /** Axis tick: dimension index d, label k, world position for Html */
@@ -89,29 +115,43 @@ function buildAxisTicks(shape: number[], centered: { multiIndex: number[]; pos: 
   const out: { key: string; text: string; pos: Vec3 }[] = [];
   if (!centered.length) return out;
 
-  const { min } = bboxFromPositions(centered.map((c) => c.pos));
+  const global = bboxFromPositions(centered.map((c) => c.pos));
 
   for (let d = 0; d < rank; d++) {
     const size = shape[d];
     for (let k = 0; k < size; k++) {
       const slice = centered.filter((c) => c.multiIndex[d] === k);
-      if (!slice.length) continue;
-      const cx = avg(slice.map((s) => s.pos[0]));
-      const cy = avg(slice.map((s) => s.pos[1]));
-      const cz = avg(slice.map((s) => s.pos[2]));
-      const c: Vec3 = [cx, cy, cz];
+      const B = bboxSlice(slice);
+      if (!B) continue;
 
       let pos: Vec3;
       if (rank === 1) {
-        pos = [c[0], min[1] - margin, 0];
+        const mx = (B.min[0] + B.max[0]) / 2;
+        pos = [mx, global.min[1] - margin, 0];
       } else if (rank === 2) {
-        if (d === 0) pos = [c[0], min[1] - margin, c[2]];
-        else pos = [min[0] - margin, c[1], c[2]];
+        if (d === 0) {
+          const my = (B.min[1] + B.max[1]) / 2;
+          pos = [B.min[0] - margin, my, 0];
+        } else {
+          const mx = (B.min[0] + B.max[0]) / 2;
+          pos = [mx, B.min[1] - margin, 0];
+        }
       } else if (rank === 3) {
-        if (d === 0) pos = [c[0], min[1] - margin, c[2]];
-        else if (d === 1) pos = [min[0] - margin, c[1], c[2]];
-        else pos = [c[0], c[1], min[2] - margin];
+        if (d === 0) {
+          const my = (B.min[1] + B.max[1]) / 2;
+          pos = [B.min[0] - margin, my, B.min[2] - margin];
+        } else if (d === 1) {
+          const mx = (B.min[0] + B.max[0]) / 2;
+          pos = [mx, B.min[1] - margin, B.min[2] - margin];
+        } else {
+          const mx = (B.min[0] + B.max[0]) / 2;
+          const my = (B.min[1] + B.max[1]) / 2;
+          pos = [mx, my, B.min[2] - margin];
+        }
       } else {
+        const cx = avg(slice.map((s) => s.pos[0]));
+        const cy = avg(slice.map((s) => s.pos[1]));
+        const cz = avg(slice.map((s) => s.pos[2]));
         const dirs: Vec3[] = [
           [0, -1, 0],
           [-1, 0, 0],
@@ -121,7 +161,7 @@ function buildAxisTicks(shape: number[], centered: { multiIndex: number[]; pos: 
         ];
         const dir = dirs[d % dirs.length];
         const bump = margin + (d * 0.04 + k * 0.02) * 0.15;
-        pos = [c[0] + dir[0] * bump, c[1] + dir[1] * bump, c[2] + dir[2] * bump];
+        pos = [cx + dir[0] * bump, cy + dir[1] * bump, cz + dir[2] * bump];
       }
       out.push({ key: `d${d}-k${k}`, text: String(k), pos });
     }
@@ -169,6 +209,32 @@ function AxisTicks({
         </Html>
       ))}
     </group>
+  );
+}
+
+function CameraRig({ view, resetNonce }: { view: CameraView; resetNonce: number }) {
+  const cameraRef = useRef<THREE.PerspectiveCamera>(null);
+  const controlsRef = useRef<any>(null);
+
+  useEffect(() => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+
+    camera.position.set(...view.position);
+    camera.lookAt(...view.target);
+    controls.target.set(...view.target);
+    controls.update();
+    if (typeof controls.saveState === "function") {
+      controls.saveState();
+    }
+  }, [view, resetNonce]);
+
+  return (
+    <>
+      <PerspectiveCamera ref={cameraRef} makeDefault position={view.position} fov={48} />
+      <OrbitControls ref={controlsRef} enableDamping dampingFactor={0.08} />
+    </>
   );
 }
 
@@ -292,13 +358,19 @@ function Scene({
 export function TensorCanvas({
   data,
   darkMode = true,
+  resetNonce = 0,
 }: {
   data: VisualizeResponse | null;
   darkMode?: boolean;
+  resetNonce?: number;
 }) {
   const [runId, setRunId] = useState(0);
   const [run, setRun] = useState(false);
   const sceneBg = darkMode ? "#0b0f12" : "#f1f5f9";
+  const cameraView = useMemo(
+    () => cameraViewForPositions(data?.after.elements.map((e) => e.position as Vec3) ?? []),
+    [data],
+  );
 
   useEffect(() => {
     if (!data) {
@@ -320,8 +392,7 @@ export function TensorCanvas({
   return (
     <div className="h-full min-h-[420px] w-full rounded-lg border border-border bg-muted/30">
       <Canvas dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.NoToneMapping }}>
-        <PerspectiveCamera makeDefault position={[8, 6, 10]} fov={48} />
-        <OrbitControls enableDamping dampingFactor={0.08} />
+        <CameraRig view={cameraView} resetNonce={resetNonce} />
         <ambientLight intensity={1} />
         <color attach="background" args={[sceneBg]} />
         <Suspense fallback={null}>

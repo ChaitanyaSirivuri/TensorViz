@@ -77,7 +77,7 @@ export function BaseTensorPreviews({
   if (!current) return null;
 
   return (
-    <div className="pointer-events-auto absolute right-3 top-3 z-20 flex w-[min(220px,40vw)] flex-col gap-1 rounded-lg border border-border bg-background/95 p-2 shadow-md backdrop-blur-sm">
+    <div className="flex w-full min-w-0 flex-col gap-1 rounded-lg border border-border bg-background/95 p-2 shadow-md backdrop-blur-sm xl:w-[220px] xl:min-w-[220px]">
       <div className="flex items-center justify-between gap-1">
         <span className="text-[10px] font-medium text-muted-foreground">Input tensors</span>
         {list.length > 1 && (

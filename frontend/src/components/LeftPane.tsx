@@ -93,13 +93,15 @@ export function LeftPane({
   onError,
   busy,
   setBusy,
-  onReset,
+  onClearCanvas,
+  onResetCanvas,
 }: {
   onResult: (r: VisualizeResponse) => void;
   onError: (msg: string | null) => void;
   busy: boolean;
   setBusy: (b: boolean) => void;
-  onReset: () => void;
+  onClearCanvas: () => void;
+  onResetCanvas: () => void;
 }) {
   const [tab, setTab] = useState<"gui" | "code">("gui");
   const [shapeStr, setShapeStr] = useState("[2, 3]");
@@ -469,7 +471,10 @@ export function LeftPane({
       <Button className="w-full" onClick={() => void run()} disabled={busy}>
         {busy ? "Running…" : "Visualize output"}
       </Button>
-      <Button type="button" variant="outline" className="w-full" onClick={onReset}>
+      <Button type="button" variant="outline" className="w-full" onClick={onClearCanvas}>
+        Clear canvas
+      </Button>
+      <Button type="button" variant="outline" className="w-full" onClick={onResetCanvas}>
         Reset canvas
       </Button>
     </div>
