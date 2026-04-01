@@ -1,31 +1,66 @@
-# TensorViz
+﻿<p align="center">
+  <img src="./assets/cover.png" alt="TensorViz" width="100%" />
+</p>
 
-TensorViz is a small full-stack app for **exploring PyTorch tensor operations visually**. A **FastAPI** backend runs tensor code (GUI-selected ops or user Python snippets) with **PyTorch**, and a **React + Vite** frontend renders the results with **React Three Fiber** so you can see shapes and values change after each operation.
+<p align="center">
+  <b><em>Supercharge Your Tensor Operations Understanding 🚀</em></b><br>
+  Explore PyTorch tensor workflows visually in an interactive 3D environment.
+</p>
 
-## Repository layout
+<p align="center">
+  <a href="https://tensorviz.netlify.app/"><img src="https://img.shields.io/badge/Live%20Demo-tensorviz.netlify.app-00C7B7?style=for-the-badge&logo=netlify&logoColor=white" alt="Live Demo"></a>
+  <a href="https://pytorch.org/get-started/locally/"><img src="https://img.shields.io/badge/Powered_by-PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" alt="Powered by PyTorch">
+  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="Backend FastAPI">
+  <a href="https://r3f.docs.pmnd.rs/getting-started/introduction"><img src="https://img.shields.io/badge/Frontend-React_Three_Fiber-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="Frontend React">
+</p>
 
-- **`backend/`** — FastAPI API (`/api/visualize`, `/health`), powered by `uv` and `pyproject.toml` / `uv.lock`.
-- **`frontend/`** — Vite + React + TypeScript UI; dependencies are managed with **Bun** (`package.json`, `bun.lock`).
+<p align="center">
+  <a href="https://tensorviz.netlify.app/"><b>Live Demo</b></a> | 
+  <a href="#quick-start"><b>Quick Start</b></a> | 
+  <a href="#repository-layout"><b>Architecture</b></a> | 
+  <a href="#docker-deployment"><b>Docker</b></a>
+</p>
 
-The browser talks to the API using `VITE_API_URL` (see `frontend/src/lib/api.ts`), which defaults to `http://127.0.0.1:8000` for local development.
+---
 
-## Run locally (without Docker)
+## ⚡ Overview
 
-### Backend
+**TensorViz** is a developer-focused, full-stack application for visualizing PyTorch tensor operations in real-time. Whether you're debugging complex dimensional transformations or simply learning tensor manipulaton basics, TensorViz provides an intuitive 3D representation where you can see shapes and values change after each operation.
 
-From the repo root:
+- **Backend:** High-performance **FastAPI** service running live **PyTorch** computations natively.
+- **Frontend:** Slick **React + Vite** SPA powered by **React Three Fiber** for declarative 3D modeling.
+
+<p align="center">
+  <img src="./assets/sample.png" alt="TensorViz Screenshot" width="100%" />
+</p>
+
+---
+
+## 🏗️ Repository Layout (Monorepo)
+
+- **Backend/** — Python/FastAPI API (/api/visualize, /health). Uses uv for blazing-fast dependency management via pyproject.toml / uv.lock.
+- **Frontend/** — React + TS SPA. Dependencies are managed natively with **Bun** (package.json, bun.lock).
+
+> 💡 **Note on API Routing:** The frontend communicates with the API via the VITE_API_URL environment variable (defaults to http://127.0.0.1:8000 for local dev). In production, it targets our Hugging Face Space endpoint.
+
+---
+
+## 🚀 Quick Start (Local Development)
+
+### 1. Start the Backend
+
+From the repository root:
 
 ```powershell
 cd backend
 uv sync
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+*(Requires [uv](https://docs.astral.sh/uv/) and Python >= 3.11)*
 
-Requires [uv](https://docs.astral.sh/uv/) and Python ≥ 3.11.
+### 2. Start the Frontend
 
-### Frontend
-
-In another terminal:
+In a secondary terminal window:
 
 ```powershell
 cd frontend
@@ -33,34 +68,22 @@ bun install
 bun run dev
 ```
 
-Open **http://localhost:5173**. Ensure the backend is running on port **8000** (or set `VITE_API_URL` in `frontend/.env`).
+Open **http://localhost:5173**. Ensure the backend is operational on port 8000 (or redefine `VITE_API_URL` in Frontend/.env).
 
-### Production-style frontend build
+---
 
-```powershell
-cd frontend
-bun install
-bun run build
-bun run preview
-```
+## 🐳 Docker Deployment
 
-## Run with Docker
+To build and start the complete application layer (frontend + backend) using Docker Compose from the **repository root**:
 
-Build and start both services from the **repository root**:
-
-```powershell
+```shell
 docker compose up --build
 ```
 
-Then open **http://localhost:5173** for the UI. The API is on **http://localhost:8000** (health check: **http://localhost:8000/health**).
+- **Frontend UI:** http://localhost:5173
+- **Backend API:** http://localhost:8000
+- **Health Check:** http://localhost:8000/health
 
-The frontend image bakes in `VITE_API_URL=http://127.0.0.1:8000` so the browser (on your machine) calls the published API port. If you deploy behind another host or port, rebuild the frontend with a build argument, for example:
-
-```powershell
-docker compose build frontend --build-arg VITE_API_URL=https://api.example.com
-```
-
-### Implementation notes
-
-- **Backend image** uses the **Astral** [`ghcr.io/astral-sh/uv`](https://ghcr.io/astral-sh/uv) Python image, runs `uv sync --frozen`, and starts **uvicorn** via `uv run`. (Python/uv is only used for the API; the UI is built with Bun.) **PyTorch** is resolved from the official **CPU** wheel index (`pyproject.toml` / `uv.lock`) so Docker does not pull CUDA/NVIDIA packages.
-- **Frontend image** uses [**oven/bun**](https://hub.docker.com/r/oven/bun): dependency layers copy only `package.json` and `bun.lock` before `bun install`; the app is built with `bun run build`, then static files are served with the `serve` CLI on port 5173.
+### Container Architecture Notes
+- **Backend Image:** Inherits from the Astral [ghcr.io/astral-sh/uv](https://ghcr.io/astral-sh/uv) base. It executes uv sync --frozen and runs Uvicorn. PyTorch is locked to the official **CPU-only wheel** to negate pulling massive CUDA/NVIDIA layers into ordinary deployments.
+- **Frontend Image:** Powered by [**oven/bun**](https://hub.docker.com/r/oven/bun). Implements layer caching by sequentially copying package.json && bun.lock, installing, building (bun run build), and locally exposing the static assets over port 5173.
